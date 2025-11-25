@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>视频自动化工具</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        .main-layout {
+            display: flex;
+            gap: 20px;
+        }
+        .left-panel {
+            flex: 1;
+        }
+        .right-panel {
+            flex: 1;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .btn-secondary {
+            background-color: #6c757d;
+        }
+        .btn-secondary:hover {
+            background-color: #545b62;
+        }
+        .btn-success {
+            background-color: #28a745;
+        }
+        .btn-success:hover {
+            background-color: #218838;
+        }
+        .progress-container {
+            margin-top: 20px;
+        }
+        #progressText {
+            width: 100%;
+            height: 150px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: #f8f9fa;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        #dropArea {
+            border: 2px dashed #ccc;
+            border-radius: 4px;
+            padding: 20px;
+            text-align: center;
+            margin-bottom: 15px;
+            transition: border-color 0.3s;
+        }
+        #dropArea.dragover {
+            border-color: #007bff;
+            background-color: #f0f8ff;
+        }
+        #imageList {
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 10px;
+            margin-bottom: 15px;
+        }
+        .image-item {
+            display: flex;
+            align-items: center;
+            padding: 5px;
+            border-bottom: 1px solid #eee;
+        }
+        .image-item:last-child {
+            border-bottom: none;
+        }
+        .image-item.draggable {
+            cursor: move;
+        }
+        .image-item .drag-handle {
+            margin-right: 10px;
+            cursor: move;
+        }
+        .video-preview {
+            width: 100%;
+            height: 900px;
+            background-color: #000;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            margin-bottom: 15px;
+            position: relative;
+        }
+        .video-preview video {
+            max-width: 100%;
+            max-height: 100%;
+            display: none;
+        }
+        .video-placeholder {
+            text-align: center;
+        }
+        .export-section {
+            text-align: center;
+            margin-top: 20px;
+        }
+        /* Resolution inputs in one line */
+        .resolution-inputs {
+            display: flex;
+            gap: 10px;
+        }
+        .resolution-inputs > div {
+            flex: 1;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>运营视频剪辑工具</h1>
+        <div class="server-notice" style="text-align: center; color: #666; margin-bottom: 20px; background-color: #ffe6e6; padding: 10px; border-radius: 8px;">
+            服务器性能较弱，目前稳定可设置的视频分辨率：1080*2048，帧率30，尽量不要修改默认属性
+        </div>
+        <div class="main-layout">
+            <!-- Left Panel - Input Options -->
+            <div class="left-panel">
+                <form id="videoForm">
+                    <div class="form-group">
+                        <label for="dropArea">上传图片 (拖拽或点击选择):</label>
+                        <div id="dropArea">
+                            <p>将图片拖拽到这里或点击选择文件</p>
+                            <input type="file" id="fileInput" multiple accept="image/*" style="display: none;">
+                        </div>
+                        <div>
+                            <button type="button" id="selectImagesBtn">选择图片</button>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>图片顺序:</label>
+                        <div id="imageList">
+                            <p>暂无图片</p>
+                        </div>
+                        <div>
+                            <button type="button" id="sortByNameBtn">按名称排序</button>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="musicSelect">背景音乐:</label>
+                        <select id="musicSelect">
+                            <option value="">无背景音乐</option>
+                        </select>
+                    </div>
+                    
+                    <fieldset>
+                        <legend>视频参数设置</legend>
+                        <div class="form-group">
+                            <label for="durationPerImage">每张图片显示时长(秒):</label>
+                            <input type="number" id="durationPerImage" value="5" min="1">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="fps">帧率(FPS):</label>
+                            <input type="number" id="fps" value="30" min="1" max="60">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="performanceMode">性能模式:</label>
+                            <select id="performanceMode">
+                                <option value="normal">标准模式</option>
+                                <option value="low">低性能模式 (降低质量以提高速度)</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>输出分辨率:</label>
+                            <div class="resolution-inputs">
+                                <div>
+                                    <input type="number" id="width" placeholder="宽度: 1080">
+                                </div>
+                                <div>
+                                    <input type="number" id="height" placeholder="高度: 2048">
+                                </div>
+                            </div>
+                        </div>
+                    </fieldset>
+
+                    <div class="button-group">
+                        <button type="submit" id="startButton">生成视频</button>
+                        <button type="button" class="btn-secondary" id="resetButton">重置</button>
+                    </div>
+                </form>
+                
+                <div class="progress-container">
+                    <h3>处理进度</h3>
+                    <div id="progressText"></div>
+                </div>
+            </div>
+            
+            <!-- Right Panel - Video Preview and Export -->
+            <div class="right-panel">
+                <h3>视频预览</h3>
+                <div class="video-preview">
+                    <div class="video-placeholder" id="videoPlaceholder">
+                        <p>视频将在此处预览</p>
+                    </div>
+                    <video id="videoPlayer" controls></video>
+                </div>
+                
+                <div class="export-section">
+                    <button type="button" class="btn-success" id="exportButton" disabled>导出视频</button>
+                    <div id="videoInfo" style="margin-top: 15px;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let uploadedImages = [];
+        let videoBlob = null;
+        let videoPath = null;
+        
+        // DOM Elements
+        const dropArea = document.getElementById('dropArea');
+        const fileInput = document.getElementById('fileInput');
+        const selectImagesBtn = document.getElementById('selectImagesBtn');
+        const imageList = document.getElementById('imageList');
+        const sortByNameBtn = document.getElementById('sortByNameBtn');
+        const musicSelect = document.getElementById('musicSelect');
+        const videoPlaceholder = document.getElementById('videoPlaceholder');
+        const videoPlayer = document.getElementById('videoPlayer');
+        const exportButton = document.getElementById('exportButton');
+        const videoInfo = document.getElementById('videoInfo');
+        
+        // Update progress text
+        function updateProgress(message) {
+            const progressText = document.getElementById('progressText');
+            progressText.textContent += message + '\n';
+            progressText.scrollTop = progressText.scrollHeight;
+        }
+        
+        // Load music files
+        async function loadMusicFiles() {
+            try {
+                const response = await fetch('/music-files');
+                const data = await response.json();
+                
+                if (data.success) {
+                    const musicSelect = document.getElementById('musicSelect');
+                    // Clear existing options except the first one
+                    musicSelect.innerHTML = '<option value="">无背景音乐</option>';
+                    
+                    data.musicFiles.forEach(file => {
+                        const option = document.createElement('option');
+                        option.value = file;
+                        option.textContent = file;
+                        musicSelect.appendChild(option);
+                    });
+                    
+                    updateProgress(`音乐文件列表已加载 (${data.musicFiles.length} 个文件)`);
+                } else {
+                    updateProgress(`加载音乐文件失败: ${data.message}`);
+                }
+            } catch (error) {
+                updateProgress(`加载音乐文件出错: ${error.message}`);
+            }
+        }
+        
+        // Handle drag and drop events
+        function setupDragAndDrop() {
+            // First, remove any existing event listeners by cloning the element
+            const oldDropArea = dropArea;
+            const newDropArea = oldDropArea.cloneNode(true);
+            oldDropArea.parentNode.replaceChild(newDropArea, oldDropArea);
+            
+            // Update the reference to the new element
+            window.dropArea = newDropArea; // Update global variable
+            newDropArea.id = 'dropArea'; // Ensure the ID is preserved
+            
+            newDropArea.addEventListener('click', () => {
+                fileInput.click();
+            });
+            
+            fileInput.addEventListener('change', (e) => {
+                handleFiles(e.target.files);
+            });
+            
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                newDropArea.addEventListener(eventName, preventDefaults, false);
+            });
+            
+            function preventDefaults(e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+            
+            ['dragenter', 'dragover'].forEach(eventName => {
+                newDropArea.addEventListener(eventName, highlight, false);
+            });
+            
+            ['dragleave', 'drop'].forEach(eventName => {
+                newDropArea.addEventListener(eventName, unhighlight, false);
+            });
+            
+            function highlight() {
+                newDropArea.classList.add('dragover');
+            }
+            
+            function unhighlight() {
+                newDropArea.classList.remove('dragover');
+            }
+            
+            newDropArea.addEventListener('drop', handleDrop, false);
+            
+            function handleDrop(e) {
+                const dt = e.dataTransfer;
+                const files = dt.files;
+                handleFiles(files);
+            }
+        }
+        
+        // Handle uploaded files
+        function handleFiles(files) {
+            [...files].forEach(file => {
+                if (!file.type.match('image.*')) {
+                    updateProgress(`跳过非图片文件: ${file.name}`);
+                    return;
+                }
+                
+                // Check if file already exists
+                if (uploadedImages.some(img => img.name === file.name)) {
+                    updateProgress(`文件已存在: ${file.name}`);
+                    return;
+                }
+                
+                uploadedImages.push({
+                    name: file.name,
+                    file: file,
+                    url: URL.createObjectURL(file),
+                    lastModified: file.lastModified
+                });
+            });
+            
+            // Sort the images immediately after adding new ones
+            sortImagesByName();
+            renderImageList();
+            updateProgress(`已添加 ${files.length} 个文件`);
+        }
+        
+        // Render image list
+        function renderImageList() {
+            if (uploadedImages.length === 0) {
+                imageList.innerHTML = '<p>暂无图片</p>';
+                return;
+            }
+            
+            imageList.innerHTML = '';
+            uploadedImages.forEach((image, index) => {
+                const imageItem = document.createElement('div');
+                imageItem.className = 'image-item draggable';
+                imageItem.draggable = true;
+                imageItem.innerHTML = `
+                    <span class="drag-handle">☰</span>
+                    <span>${image.name}</span>
+                    <button type="button" class="btn-secondary" style="margin-left: auto; padding: 2px 8px;" data-index="${index}">删除</button>
+                `;
+                imageList.appendChild(imageItem);
+            });
+            
+            // Add event listeners for delete buttons
+            document.querySelectorAll('#imageList .btn-secondary').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    const index = parseInt(e.target.getAttribute('data-index'));
+                    removeImage(index);
+                });
+            });
+            
+            // Add drag and drop functionality for reordering
+            setupImageReordering();
+        }
+        
+        // Remove image from list
+        function removeImage(index) {
+            const image = uploadedImages[index];
+            URL.revokeObjectURL(image.url); // Free memory
+            uploadedImages.splice(index, 1);
+            renderImageList();
+        }
+        
+        // Setup image reordering
+        function setupImageReordering() {
+            const draggables = document.querySelectorAll('.image-item');
+            const container = imageList;
+            
+            draggables.forEach(draggable => {
+                draggable.addEventListener('dragstart', () => {
+                    draggable.classList.add('dragging');
+                });
+                
+                draggable.addEventListener('dragend', () => {
+                    draggable.classList.remove('dragging');
+                });
+            });
+            
+            container.addEventListener('dragover', e => {
+                e.preventDefault();
+                const afterElement = getDragAfterElement(container, e.clientY);
+                const draggable = document.querySelector('.dragging');
+                if (afterElement == null) {
+                    container.appendChild(draggable);
+                } else {
+                    container.insertBefore(draggable, afterElement);
+                }
+            });
+            
+            container.addEventListener('drop', () => {
+                // Update uploadedImages array based on new order
+                const items = container.querySelectorAll('.image-item');
+                const newOrder = [];
+                items.forEach(item => {
+                    const button = item.querySelector('.btn-secondary');
+                    const index = parseInt(button.getAttribute('data-index'));
+                    newOrder.push(uploadedImages[index]);
+                });
+                uploadedImages = newOrder;
+                renderImageList(); // Re-render to update indices
+            });
+        }
+        
+        function getDragAfterElement(container, y) {
+            const draggableElements = [...container.querySelectorAll('.image-item:not(.dragging)')];
+            
+            return draggableElements.reduce((closest, child) => {
+                const box = child.getBoundingClientRect();
+                const offset = y - box.top - box.height / 2;
+                if (offset < 0 && offset > closest.offset) {
+                    return { offset: offset, element: child };
+                } else {
+                    return closest;
+                }
+            }, { offset: Number.NEGATIVE_INFINITY }).element;
+        }
+        
+        // Sort images by name using natural sort
+        function sortImagesByName() {
+            uploadedImages.sort((a, b) => {
+                // Extract base name and number from filename
+                const aMatch = a.name.match(/^(.+?)\s*\((\d+)\)(\..+)$/);
+                const bMatch = b.name.match(/^(.+?)\s*\((\d+)\)(\..+)$/);
+                
+                // For files like "LimitReview.png"
+                const aBase = aMatch ? aMatch[1] : a.name.replace(/\..*$/, '');
+                const aNum = aMatch ? parseInt(aMatch[2]) : null; // null for files without number
+                
+                // For files like "LimitReview.png" 
+                const bBase = bMatch ? bMatch[1] : b.name.replace(/\..*$/, '');
+                const bNum = bMatch ? parseInt(bMatch[2]) : null; // null for files without number
+                
+                // First compare base names
+                if (aBase !== bBase) {
+                    return aBase.localeCompare(bBase);
+                }
+                
+                // If base names are the same:
+                // 1. Files without numbers come first
+                // 2. Files with numbers come after, sorted numerically
+                if (aNum === null && bNum === null) return 0;
+                if (aNum === null) return -1;  // a has no number, b has number, a comes first
+                if (bNum === null) return 1;   // b has no number, a has number, b comes first
+                return aNum - bNum;            // both have numbers, sort numerically
+            });
+        }
+        
+        // Form submission
+        document.getElementById('videoForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            if (uploadedImages.length === 0) {
+                alert('请至少上传一张图片');
+                return;
+            }
+            
+            const startButton = document.getElementById('startButton');
+            startButton.disabled = true;
+            updateProgress('开始处理视频...');
+            
+            // Prepare form data
+            const formData = new FormData();
+            
+            // Append images
+            uploadedImages.forEach((image, index) => {
+                formData.append('images', image.file);
+            });
+            
+            // Append other parameters
+            formData.append('durationPerImage', document.getElementById('durationPerImage').value);
+            formData.append('fps', document.getElementById('fps').value);
+            formData.append('width', document.getElementById('width').value || '');
+            formData.append('height', document.getElementById('height').value || '');
+            formData.append('selectedMusic', document.getElementById('musicSelect').value);
+            formData.append('performanceMode', document.getElementById('performanceMode').value);
+            
+            updateProgress('---------------------------');
+            
+            try {
+                const response = await fetch('/create-video', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (response.ok) {
+                    // Get the video blob
+                    videoBlob = await response.blob();
+                    const videoUrl = URL.createObjectURL(videoBlob);
+                    
+                    // Show video in preview
+                    videoPlayer.src = videoUrl;
+                    videoPlayer.style.display = 'block';
+                    videoPlaceholder.style.display = 'none';
+                    
+                    // Enable export button
+                    exportButton.disabled = false;
+                    
+                    updateProgress('视频处理完成!');
+                } else {
+                    const errorData = await response.json();
+                    throw new Error(errorData.message || 'Unknown error');
+                }
+            } catch (error) {
+                updateProgress(`处理出错: ${error.message}`);
+            } finally {
+                startButton.disabled = false;
+            }
+        });
+        
+        // Export video
+        document.getElementById('exportButton').addEventListener('click', function() {
+            if (!videoBlob) {
+                alert('没有可导出的视频');
+                return;
+            }
+            
+            // In a real implementation, this would download the actual video file
+            const a = document.createElement('a');
+            a.href = videoPlayer.src;
+            a.download = 'output_video.mp4';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            
+            updateProgress('视频已导出');
+        });
+        
+        // Reset form
+        document.getElementById('resetButton').addEventListener('click', function() {
+            // Clear uploaded images
+            uploadedImages.forEach(image => {
+                URL.revokeObjectURL(image.url);
+            });
+            uploadedImages = [];
+            renderImageList();
+            
+            // Reset form fields
+            document.getElementById('durationPerImage').value = 5;
+            document.getElementById('fps').value = 30;
+            document.getElementById('width').value = 1080;
+            document.getElementById('height').value = 2048;
+            document.getElementById('musicSelect').selectedIndex = 0;
+            
+            // Hide video preview
+            videoPlayer.style.display = 'none';
+            videoPlaceholder.style.display = 'block';
+            videoPlayer.src = '';
+            
+            // Disable export button
+            exportButton.disabled = true;
+            
+            // Clear progress
+            document.getElementById('progressText').textContent = '';
+            
+            // Re-setup drag and drop event listeners
+            setupDragAndDrop();
+            
+            // Re-setup button event listeners
+            selectImagesBtn.addEventListener('click', () => fileInput.click());
+            sortByNameBtn.addEventListener('click', sortImagesByName);
+            
+            updateProgress('表单已重置');
+        });
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            setupDragAndDrop();
+            loadMusicFiles();
+            
+            // Event listeners
+            selectImagesBtn.addEventListener('click', () => fileInput.click());
+            sortByNameBtn.addEventListener('click', sortImagesByName);
+            
+            // Set default values for resolution
+            document.getElementById('width').value = 1080;
+            document.getElementById('height').value = 2048;
+            document.getElementById('fps').value = 30;
+        });
+    </script>
+</body>
+</html>
